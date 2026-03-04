@@ -23,21 +23,40 @@ const sessions = {};
 
 
 // ===============================
-// HORARIO LABORAL
+// HORA COLOMBIA
 // ===============================
 
-function fueraDeHorario() {
+function obtenerHoraColombia() {
 
   const ahora = new Date();
 
-  const dia = ahora.getDay(); 
-  const hora = ahora.getHours();
+  const hora = new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    hour: "numeric",
+    hour12: false
+  }).format(ahora);
 
-  const esFinDeSemana = dia === 0 || dia === 6;
+  const dia = new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    weekday: "short"
+  }).format(ahora);
 
-  const fueraHorario = hora < 8 || hora >= 18;
+  return {
+    hora: parseInt(hora),
+    dia
+  };
 
-  return esFinDeSemana || fueraHorario;
+}
+
+function fueraDeHorario() {
+
+  const { hora, dia } = obtenerHoraColombia();
+
+  const finDeSemana =
+    dia.includes("sáb") ||
+    dia.includes("dom");
+
+  return finDeSemana || hora < 8 || hora >= 18;
 
 }
 
@@ -58,7 +77,7 @@ async function enviarAGoogleSheets(datos) {
       body: JSON.stringify(datos),
     });
 
-    console.log("✅ Datos enviados a Google Sheets");
+    console.log("✅ Lead guardado en Google Sheets");
 
   } catch (error) {
 
@@ -96,13 +115,15 @@ Familia
 Penal
 Seguros
 
-Responde únicamente con el nombre exacto del área.
-`,
+Responde únicamente con el nombre del área.
+`
         },
-        { role: "user", content: caso },
+
+        { role: "user", content: caso }
+
       ],
 
-      temperature: 0,
+      temperature: 0
 
     });
 
@@ -190,13 +211,22 @@ async function procesarMensaje(sessionId, message) {
 
     sessions[sessionId] = {
       estado: "BIENVENIDA",
-      areaDetectada: "",
-      caso: "",
+      area: "",
+      caso: ""
     };
 
   }
 
   const session = sessions[sessionId];
+
+
+  // ===============================
+  // IGNORAR SALUDOS REPETIDOS
+  // ===============================
+
+  if (session.estado !== "BIENVENIDA" && esSaludo(message)) {
+    return [];
+  }
 
 
   // ===============================
@@ -209,28 +239,26 @@ async function procesarMensaje(sessionId, message) {
 
     if (fueraDeHorario()) {
 
-      return [
+      return [`
+Gracias por comunicarse con *JURÍDICAS BOGOTÁ* ⚖️
 
-`Gracias por comunicarse con JURÍDICAS BOGOTÁ ⚖️`,
+Nuestro horario de atención es:
+Lunes a viernes de 8:00 AM a 6:00 PM.
 
-`Nuestro horario de atención es de lunes a viernes de 8:00 AM a 6:00 PM.`,
+Mientras tanto podemos registrar su caso.
 
-`Mientras tanto podemos registrar su caso.`,
-
-`Por favor descríbanos brevemente su situación jurídica.`
-
-      ];
+Por favor descríbanos brevemente su situación jurídica.
+`];
 
     }
 
-    return [
+    return [`
+Bienvenido(a) a *JURÍDICAS BOGOTÁ* ⚖️
 
-`Bienvenido(a) a JURÍDICAS BOGOTÁ ⚖️
-Somos una firma especializada en defensa y acompañamiento legal.`,
+Somos una firma especializada en defensa y acompañamiento legal.
 
-`Por favor descríbanos brevemente su situación para identificar el área correspondiente.`
-
-    ];
+Por favor descríbanos brevemente su situación para identificar el área correspondiente.
+`];
 
   }
 
@@ -241,7 +269,7 @@ Somos una firma especializada en defensa y acompañamiento legal.`,
 
   if (session.estado === "ESPERANDO_CASO") {
 
-    if (esSaludo(message) || message.trim().length < 10) {
+    if (message.trim().length < 10) {
 
       return [
         "Para orientarlo mejor necesitamos que describa su situación jurídica."
@@ -251,23 +279,21 @@ Somos una firma especializada en defensa y acompañamiento legal.`,
 
     const area = await detectarArea(message);
 
-    session.areaDetectada = area;
+    session.area = area;
     session.caso = message;
 
     session.estado = "ESPERANDO_DATOS";
 
-    return [
-
-`Hemos identificado que su caso corresponde al área de ${area}.
+    return [`
+Hemos identificado que su caso corresponde al área de *${area}*.
 
 Para asignarle un abogado necesitamos:
 
 • Nombre completo
 • Cédula o NIT
 • Correo electrónico
-• Número de contacto`
-
-    ];
+• Número de contacto
+`];
 
   }
 
@@ -280,11 +306,13 @@ Para asignarle un abogado necesitamos:
 
     const datosExtraidos = extraerDatos(message);
 
-    const estadoLead = fueraDeHorario() ? "Fuera de horario" : "Nuevo";
+    const estadoLead = fueraDeHorario()
+      ? "Fuera de horario"
+      : "Nuevo";
 
     const datos = {
 
-      area_juridica: session.areaDetectada,
+      area_juridica: session.area,
       nombre: datosExtraidos.nombre,
       cedula_nit: datosExtraidos.cedula,
       correo: datosExtraidos.correo,
@@ -298,15 +326,15 @@ Para asignarle un abogado necesitamos:
 
     session.estado = "FINALIZADO";
 
-    return [
+    return [`
+Gracias por la información suministrada.
 
-"Gracias por la información suministrada.",
-
+${
 fueraDeHorario()
 ? "Un abogado revisará su caso y se comunicará con usted en el próximo horario laboral."
 : "En breve uno de nuestros abogados se comunicará con usted."
-
-    ];
+}
+`];
 
   }
 
@@ -316,9 +344,7 @@ fueraDeHorario()
   // ===============================
 
   if (session.estado === "FINALIZADO") {
-
     return [];
-
   }
 
 }
@@ -334,14 +360,6 @@ app.post("/chat", async (req, res) => {
 
     const { sessionId, message } = req.body;
 
-    if (!sessionId || !message) {
-
-      return res.status(400).json({
-        error: "sessionId y message son requeridos"
-      });
-
-    }
-
     const messages = await procesarMensaje(sessionId, message);
 
     res.json({ messages });
@@ -351,7 +369,7 @@ app.post("/chat", async (req, res) => {
     console.error(error);
 
     res.status(500).json({
-      error: "Error interno del servidor"
+      error: "Error interno"
     });
 
   }
@@ -374,9 +392,9 @@ app.post("/whatsapp", async (req, res) => {
 
     let twiml = "<Response>";
 
-    if (messages && messages.length > 0) {
+    if (messages.length > 0) {
 
-      messages.forEach((msg) => {
+      messages.forEach(msg => {
         twiml += `<Message>${msg}</Message>`;
       });
 
@@ -395,7 +413,7 @@ app.post("/whatsapp", async (req, res) => {
 
     res.send(`
 <Response>
-<Message>Ocurrió un error procesando su solicitud.</Message>
+<Message>Error procesando la solicitud.</Message>
 </Response>
 `);
 
@@ -408,8 +426,8 @@ app.post("/whatsapp", async (req, res) => {
 // SERVIDOR
 // ===============================
 
-app.listen(3000, () => {
+const PORT = process.env.PORT || 3000;
 
-  console.log("🚀 Servidor corriendo en puerto 3000");
-
+app.listen(PORT, () => {
+  console.log("🚀 Servidor corriendo en puerto", PORT);
 });
