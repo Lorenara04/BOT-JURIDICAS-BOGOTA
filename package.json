@@ -1,0 +1,28 @@
+{
+  "name": "chatbot-ia",
+  "version": "1.0.0",
+  "description": "Chatbot jurídico con OpenAI, Twilio y Google Sheets",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "chatbot",
+    "openai",
+    "whatsapp",
+    "twilio",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-fetch": "^3.3.2",
+    "openai": "^6.25.0",
+    "twilio": "^5.12.2"
+  }
+}
