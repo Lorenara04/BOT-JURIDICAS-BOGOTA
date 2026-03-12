@@ -3,14 +3,21 @@ import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 import fetch from "node-fetch";
+import "./bot.js";
 
 dotenv.config();
+
+
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.get("/", (req,res)=>{
+res.send("Bot Jurídicas Bogotá activo")
+})
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
