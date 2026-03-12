@@ -77,11 +77,11 @@ async function enviarAGoogleSheets(datos) {
       body: JSON.stringify(datos),
     });
 
-    console.log("✅ Lead guardado en Google Sheets");
+    console.log("Lead guardado en Google Sheets");
 
   } catch (error) {
 
-    console.error("❌ Error enviando a Google Sheets:", error);
+    console.error("Error enviando a Google Sheets:", error);
 
   }
 
@@ -212,17 +212,19 @@ async function procesarMensaje(sessionId, message) {
     sessions[sessionId] = {
       estado: "BIENVENIDA",
       area: "",
-      caso: ""
+      caso: "",
+      datos: {
+        nombre: "",
+        cedula: "",
+        correo: "",
+        telefono: ""
+      }
     };
 
   }
 
   const session = sessions[sessionId];
 
-
-  // ===============================
-  // IGNORAR SALUDOS REPETIDOS
-  // ===============================
 
   if (session.estado !== "BIENVENIDA" && esSaludo(message)) {
     return [];
@@ -245,7 +247,7 @@ Gracias por comunicarse con *JURÍDICAS BOGOTÁ* ⚖️
 Nuestro horario de atención es:
 Lunes a viernes de 8:00 AM a 6:00 PM.
 
-Mientras tanto podemos registrar su caso.
+podemos registrar su caso.
 
 Por favor descríbanos brevemente su situación jurídica.
 `];
@@ -306,6 +308,33 @@ Para asignarle un abogado necesitamos:
 
     const datosExtraidos = extraerDatos(message);
 
+    if (datosExtraidos.nombre) {
+      session.datos.nombre = datosExtraidos.nombre;
+    }
+
+    if (datosExtraidos.cedula) {
+      session.datos.cedula = datosExtraidos.cedula;
+    }
+
+    if (datosExtraidos.correo) {
+      session.datos.correo = datosExtraidos.correo;
+    }
+
+    if (datosExtraidos.telefono) {
+      session.datos.telefono = datosExtraidos.telefono;
+    }
+
+    if (
+      !session.datos.nombre ||
+      !session.datos.cedula ||
+      !session.datos.correo ||
+      !session.datos.telefono
+    ) {
+
+      return ["Por favor envíenos los datos faltantes: nombre completo, cédula, correo y teléfono."];
+
+    }
+
     const estadoLead = fueraDeHorario()
       ? "Fuera de horario"
       : "Nuevo";
@@ -313,10 +342,10 @@ Para asignarle un abogado necesitamos:
     const datos = {
 
       area_juridica: session.area,
-      nombre: datosExtraidos.nombre,
-      cedula_nit: datosExtraidos.cedula,
-      correo: datosExtraidos.correo,
-      telefono: datosExtraidos.telefono,
+      nombre: session.datos.nombre,
+      cedula_nit: session.datos.cedula,
+      correo: session.datos.correo,
+      telefono: session.datos.telefono,
       estado: estadoLead,
       observaciones: session.caso
 
@@ -338,10 +367,6 @@ fueraDeHorario()
 
   }
 
-
-  // ===============================
-  // FINALIZADO
-  // ===============================
 
   if (session.estado === "FINALIZADO") {
     return [];
@@ -378,56 +403,11 @@ app.post("/chat", async (req, res) => {
 
 
 // ===============================
-// WEBHOOK WHATSAPP
-// ===============================
-
-app.post("/whatsapp", async (req, res) => {
-
-  try {
-
-    const sessionId = req.body.From;
-    const message = req.body.Body;
-
-    const messages = await procesarMensaje(sessionId, message);
-
-    let twiml = "<Response>";
-
-    if (messages.length > 0) {
-
-      messages.forEach(msg => {
-        twiml += `<Message>${msg}</Message>`;
-      });
-
-    }
-
-    twiml += "</Response>";
-
-    res.type("text/xml");
-    res.send(twiml);
-
-  } catch (error) {
-
-    console.error(error);
-
-    res.type("text/xml");
-
-    res.send(`
-<Response>
-<Message>Error procesando la solicitud.</Message>
-</Response>
-`);
-
-  }
-
-});
-
-
-// ===============================
 // SERVIDOR
 // ===============================
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("🚀 Servidor corriendo en puerto", PORT);
+  console.log("Servidor corriendo en puerto", PORT);
 });

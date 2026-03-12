@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<title>Panel de Campaña - Jurídicas Bogotá</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:#f4f4f4;
+margin:0;
+padding:40px;
+}
+
+.container{
+max-width:900px;
+margin:auto;
+}
+
+.header{
+text-align:center;
+margin-bottom:40px;
+}
+
+.header h1{
+color:#1c4a2e;
+letter-spacing:3px;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:20px;
+}
+
+.card{
+background:white;
+padding:30px;
+border-radius:10px;
+box-shadow:0 4px 10px rgba(0,0,0,0.1);
+text-align:center;
+}
+
+.card h2{
+margin:0;
+font-size:40px;
+}
+
+.card p{
+margin-top:10px;
+font-size:16px;
+color:#666;
+}
+
+.green{
+color:#39C225;
+}
+
+.red{
+color:#B8260D;
+}
+
+.blue{
+color:#1c4a2e;
+}
+
+.footer{
+margin-top:40px;
+text-align:center;
+color:#888;
+font-size:13px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="header">
+
+<h1>Panel de Campaña</h1>
+<p>Jurídicas Bogotá - Estadísticas en tiempo real</p>
+
+</div>
+
+<div class="grid">
+
+<div class="card">
+<h2 id="sent" class="blue">0</h2>
+<p>Correos enviados</p>
+</div>
+
+<div class="card">
+<h2 id="open" class="green">0</h2>
+<p>Aperturas detectadas</p>
+</div>
+
+<div class="card">
+<h2 id="bounce" class="red">0</h2>
+<p>Correos rebotados</p>
+</div>
+
+<div class="card">
+<h2 id="wa" class="green">0</h2>
+<p>Clics en WhatsApp</p>
+</div>
+
+<div class="card">
+<h2 id="web" class="blue">0</h2>
+<p>Clics en página web</p>
+</div>
+
+</div>
+
+<div class="footer">
+
+© 2025 Jurídicas Bogotá
+
+</div>
+
+</div>
+
+<script>
+
+async function cargarStats(){
+
+try{
+
+const res = await fetch("/stats")
+const data = await res.json()
+
+document.getElementById("sent").innerText = data.enviados
+document.getElementById("open").innerText = data.aperturas
+document.getElementById("bounce").innerText = data.rebotes
+document.getElementById("wa").innerText = data.clic_whatsapp
+document.getElementById("web").innerText = data.clic_web
+
+}catch(e){
+
+console.log("Esperando datos...")
+
+}
+
+}
+
+cargarStats()
+
+setInterval(cargarStats,5000)
+
+</script>
+
+</body>
+</html>
