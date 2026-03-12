@@ -26,7 +26,6 @@ const GOOGLE_SCRIPT_URL =
 
 const sessions = {};
 
-
 // ===============================
 // HORA COLOMBIA
 // ===============================
@@ -228,38 +227,24 @@ export async function procesarMensaje(sessionId, message) {
 
   const session = sessions[sessionId];
 
+  // Evitar repetir saludo
   if (session.estado !== "BIENVENIDA" && esSaludo(message)) {
     return [];
   }
 
 
   // ===============================
-  // BIENVENIDA
+  // BIENVENIDA (SOLO UN MENSAJE)
   // ===============================
 
   if (session.estado === "BIENVENIDA") {
 
     session.estado = "ESPERANDO_CASO";
 
-    if (fueraDeHorario()) {
-
-      return [`
-Gracias por comunicarse con *JURÍDICAS BOGOTÁ* ⚖️
-
-Nuestro horario de atención es:
-Lunes a viernes de 8:00 AM a 6:00 PM.
-
-Podemos registrar su caso.
-
-Por favor descríbanos brevemente su situación jurídica.
-`];
-
-    }
-
     return [`
 Bienvenido(a) a *JURÍDICAS BOGOTÁ* ⚖️
 
-Somos una firma especializada  Consultoría, auditoría y acompañamiento legal.
+Somos una firma especializada en consultoría, auditoría y acompañamiento legal.
 
 Por favor descríbanos brevemente su situación para identificar el área correspondiente.
 `];
@@ -328,10 +313,6 @@ Para asignarle un abogado necesitamos:
 
     }
 
-    const estadoLead = fueraDeHorario()
-      ? "Fuera de horario"
-      : "Nuevo";
-
     const datos = {
 
       area_juridica: session.area,
@@ -339,7 +320,7 @@ Para asignarle un abogado necesitamos:
       cedula_nit: session.datos.cedula,
       correo: session.datos.correo,
       telefono: session.datos.telefono,
-      estado: estadoLead,
+      estado: "Nuevo",
       observaciones: session.caso
 
     };
@@ -351,11 +332,7 @@ Para asignarle un abogado necesitamos:
     return [`
 Gracias por la información suministrada.
 
-${
-  fueraDeHorario()
-    ? "Un abogado revisará su caso y se comunicará con usted en el próximo horario laboral."
-    : "En breve uno de nuestros abogados se comunicará con usted."
-}
+En breve uno de nuestros abogados se comunicará con usted.
 `];
 
   }
