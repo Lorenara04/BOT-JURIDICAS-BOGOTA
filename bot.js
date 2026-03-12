@@ -7,14 +7,44 @@ fetchLatestBaileysVersion
 
 import qrcode from "qrcode-terminal"
 import axios from "axios"
+import fs from "fs"
 
 // ===============================
-// CONTROL DE CONVERSACIONES
+// CONFIGURACIONES
 // ===============================
 
-const conversacionesHumanas = {}
 const OCHO_HORAS = 8 * 60 * 60 * 1000
+const ANTISPAM_TIEMPO = 3000
 
+const conversacionesHumanasFile = "./conversaciones.json"
+
+let conversacionesHumanas = {}
+let ultimoMensaje = {}
+
+// ===============================
+// CARGAR MEMORIA
+// ===============================
+
+if (fs.existsSync(conversacionesHumanasFile)) {
+  conversacionesHumanas = JSON.parse(
+    fs.readFileSync(conversacionesHumanasFile)
+  )
+}
+
+// ===============================
+// GUARDAR MEMORIA
+// ===============================
+
+function guardarMemoria() {
+  fs.writeFileSync(
+    conversacionesHumanasFile,
+    JSON.stringify(conversacionesHumanas, null, 2)
+  )
+}
+
+// ===============================
+// BOT
+// ===============================
 
 async function startBot() {
 
@@ -52,7 +82,11 @@ const shouldReconnect = reason !== DisconnectReason.loggedOut
 console.log("❌ Conexión cerrada. Reconectar:", shouldReconnect)
 
 if (shouldReconnect) {
+
+setTimeout(() => {
 startBot()
+}, 5000)
+
 }
 
 }
@@ -77,24 +111,28 @@ const from = msg.key.remoteJid
 // ❌ ignorar grupos
 if (from.endsWith("@g.us")) return
 
+// ❌ ignorar mensajes antiguos al iniciar
+if (msg.messageTimestamp * 1000 < Date.now() - 10000) return
+
 const ahora = Date.now()
 
 // ===============================
-// SI EL MENSAJE LO ENVIA EL ABOGADO
+// SI EL ABOGADO ESCRIBE
 // ===============================
 
 if (msg.key.fromMe) {
 
 conversacionesHumanas[from] = ahora
-console.log("👨‍⚖️ Conversación humana detectada, bot pausado")
+guardarMemoria()
+
+console.log("👨‍⚖️ Conversación humana detectada")
 
 return
 
 }
 
-
 // ===============================
-// SI HAY CONVERSACION HUMANA RECIENTE
+// SI HAY CONVERSACION HUMANA
 // ===============================
 
 if (conversacionesHumanas[from]) {
@@ -103,13 +141,30 @@ const ultima = conversacionesHumanas[from]
 
 if (ahora - ultima < OCHO_HORAS) {
 
+conversacionesHumanas[from] = ahora
+guardarMemoria()
+
 console.log("⏸ Bot pausado para este cliente")
+
 return
 
 }
 
 }
 
+// ===============================
+// ANTISPAM
+// ===============================
+
+if (ultimoMensaje[from]) {
+
+if (ahora - ultimoMensaje[from] < ANTISPAM_TIEMPO) {
+return
+}
+
+}
+
+ultimoMensaje[from] = ahora
 
 // ===============================
 // EXTRAER TEXTO
@@ -150,7 +205,7 @@ return
 
 
 // ===============================
-// ENVIAR RESPUESTAS
+// RESPONDER
 // ===============================
 
 for (const r of replies) {
@@ -166,7 +221,7 @@ text: r
 console.log("❌ Error procesando mensaje")
 
 if (error.response) {
-console.log("Servidor respondió con error:", error.response.data)
+console.log(error.response.data)
 } else {
 console.log(error.message)
 }
