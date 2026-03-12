@@ -7,24 +7,22 @@ import "./bot.js";
 
 dotenv.config();
 
-
-
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get("/", (req,res)=>{
-res.send("Bot Jurídicas Bogotá activo")
-})
+app.get("/", (req, res) => {
+  res.send("Bot Jurídicas Bogotá activo");
+});
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 const GOOGLE_SCRIPT_URL =
-"https://script.google.com/macros/s/AKfycby6yTmqBFvuAmYKSTIiLw3hVYH6iR8X2ZVKaWSlOfCPlFBDabbikMyzU6xbdFlwYU5A0g/exec";
+  "https://script.google.com/macros/s/AKfycby6yTmqBFvuAmYKSTIiLw3hVYH6iR8X2ZVKaWSlOfCPlFBDabbikMyzU6xbdFlwYU5A0g/exec";
 
 const sessions = {};
 
@@ -125,9 +123,7 @@ Seguros
 Responde únicamente con el nombre del área.
 `
         },
-
         { role: "user", content: caso }
-
       ],
 
       temperature: 0
@@ -212,7 +208,7 @@ function extraerDatos(texto) {
 // LOGICA DEL BOT
 // ===============================
 
-async function procesarMensaje(sessionId, message) {
+export async function procesarMensaje(sessionId, message) {
 
   if (!sessions[sessionId]) {
 
@@ -231,7 +227,6 @@ async function procesarMensaje(sessionId, message) {
   }
 
   const session = sessions[sessionId];
-
 
   if (session.estado !== "BIENVENIDA" && esSaludo(message)) {
     return [];
@@ -254,7 +249,7 @@ Gracias por comunicarse con *JURÍDICAS BOGOTÁ* ⚖️
 Nuestro horario de atención es:
 Lunes a viernes de 8:00 AM a 6:00 PM.
 
-podemos registrar su caso.
+Podemos registrar su caso.
 
 Por favor descríbanos brevemente su situación jurídica.
 `];
@@ -264,7 +259,7 @@ Por favor descríbanos brevemente su situación jurídica.
     return [`
 Bienvenido(a) a *JURÍDICAS BOGOTÁ* ⚖️
 
-Somos una firma especializada en defensa y acompañamiento legal.
+Somos una firma especializada  Consultoría, auditoría y acompañamiento legal.
 
 Por favor descríbanos brevemente su situación para identificar el área correspondiente.
 `];
@@ -298,9 +293,9 @@ Hemos identificado que su caso corresponde al área de *${area}*.
 
 Para asignarle un abogado necesitamos:
 
-• Nombre completo
-• Cédula o NIT
-• Correo electrónico
+• Nombre completo  
+• Cédula o NIT  
+• Correo electrónico  
 • Número de contacto
 `];
 
@@ -315,21 +310,10 @@ Para asignarle un abogado necesitamos:
 
     const datosExtraidos = extraerDatos(message);
 
-    if (datosExtraidos.nombre) {
-      session.datos.nombre = datosExtraidos.nombre;
-    }
-
-    if (datosExtraidos.cedula) {
-      session.datos.cedula = datosExtraidos.cedula;
-    }
-
-    if (datosExtraidos.correo) {
-      session.datos.correo = datosExtraidos.correo;
-    }
-
-    if (datosExtraidos.telefono) {
-      session.datos.telefono = datosExtraidos.telefono;
-    }
+    if (datosExtraidos.nombre) session.datos.nombre = datosExtraidos.nombre;
+    if (datosExtraidos.cedula) session.datos.cedula = datosExtraidos.cedula;
+    if (datosExtraidos.correo) session.datos.correo = datosExtraidos.correo;
+    if (datosExtraidos.telefono) session.datos.telefono = datosExtraidos.telefono;
 
     if (
       !session.datos.nombre ||
@@ -338,7 +322,9 @@ Para asignarle un abogado necesitamos:
       !session.datos.telefono
     ) {
 
-      return ["Por favor envíenos los datos faltantes: nombre completo, cédula, correo y teléfono."];
+      return [
+        "Por favor envíenos los datos faltantes: nombre completo, cédula, correo y teléfono."
+      ];
 
     }
 
@@ -366,14 +352,13 @@ Para asignarle un abogado necesitamos:
 Gracias por la información suministrada.
 
 ${
-fueraDeHorario()
-? "Un abogado revisará su caso y se comunicará con usted en el próximo horario laboral."
-: "En breve uno de nuestros abogados se comunicará con usted."
+  fueraDeHorario()
+    ? "Un abogado revisará su caso y se comunicará con usted en el próximo horario laboral."
+    : "En breve uno de nuestros abogados se comunicará con usted."
 }
 `];
 
   }
-
 
   if (session.estado === "FINALIZADO") {
     return [];
@@ -413,7 +398,7 @@ app.post("/chat", async (req, res) => {
 // SERVIDOR
 // ===============================
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
   console.log("Servidor corriendo en puerto", PORT);

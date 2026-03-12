@@ -8,6 +8,14 @@ fetchLatestBaileysVersion
 import qrcode from "qrcode-terminal"
 import axios from "axios"
 
+// ===============================
+// CONTROL DE CONVERSACIONES
+// ===============================
+
+const conversacionesHumanas = {}
+const OCHO_HORAS = 8 * 60 * 60 * 1000
+
+
 async function startBot() {
 
 const { state, saveCreds } = await useMultiFileAuthState("auth")
@@ -51,6 +59,11 @@ startBot()
 
 })
 
+
+// ===============================
+// MENSAJES
+// ===============================
+
 sock.ev.on("messages.upsert", async ({ messages }) => {
 
 try {
@@ -58,9 +71,49 @@ try {
 const msg = messages[0]
 
 if (!msg.message) return
-if (msg.key.fromMe) return
 
 const from = msg.key.remoteJid
+
+// ❌ ignorar grupos
+if (from.endsWith("@g.us")) return
+
+const ahora = Date.now()
+
+// ===============================
+// SI EL MENSAJE LO ENVIA EL ABOGADO
+// ===============================
+
+if (msg.key.fromMe) {
+
+conversacionesHumanas[from] = ahora
+console.log("👨‍⚖️ Conversación humana detectada, bot pausado")
+
+return
+
+}
+
+
+// ===============================
+// SI HAY CONVERSACION HUMANA RECIENTE
+// ===============================
+
+if (conversacionesHumanas[from]) {
+
+const ultima = conversacionesHumanas[from]
+
+if (ahora - ultima < OCHO_HORAS) {
+
+console.log("⏸ Bot pausado para este cliente")
+return
+
+}
+
+}
+
+
+// ===============================
+// EXTRAER TEXTO
+// ===============================
 
 const text =
 msg.message.conversation ||
@@ -71,6 +124,11 @@ msg.message.videoMessage?.caption
 if (!text) return
 
 console.log("📩 Mensaje recibido:", text)
+
+
+// ===============================
+// ENVIAR AL SERVIDOR
+// ===============================
 
 const response = await axios.post(
 "https://bot-juridicas-bogota.onrender.com/chat",
@@ -89,6 +147,11 @@ if (!replies.length) {
 console.log("⚠️ No hubo respuesta del servidor")
 return
 }
+
+
+// ===============================
+// ENVIAR RESPUESTAS
+// ===============================
 
 for (const r of replies) {
 
