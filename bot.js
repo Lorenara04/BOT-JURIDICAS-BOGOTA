@@ -13,7 +13,7 @@ import fs from "fs"
 // CONFIGURACIONES
 // ===============================
 
-const OCHO_HORAS = 8 * 60 * 60 * 1000
+const OCHO_HORAS = 5  * 60 * 1000
 const ANTISPAM_TIEMPO = 3000
 
 const conversacionesHumanasFile = "./conversaciones.json"
