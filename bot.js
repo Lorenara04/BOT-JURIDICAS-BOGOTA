@@ -13,7 +13,9 @@ import fs from "fs"
 // CONFIGURACIONES
 // ===============================
 
-const OCHO_HORAS = 5  * 60 * 1000
+// 5 minutos para pruebas
+const OCHO_HORAS = 5 * 60 * 1000
+
 const ANTISPAM_TIEMPO = 3000
 
 const conversacionesHumanasFile = "./conversaciones.json"
@@ -36,10 +38,12 @@ if (fs.existsSync(conversacionesHumanasFile)) {
 // ===============================
 
 function guardarMemoria() {
+
   fs.writeFileSync(
     conversacionesHumanasFile,
     JSON.stringify(conversacionesHumanas, null, 2)
   )
+
 }
 
 // ===============================
@@ -53,46 +57,74 @@ const { state, saveCreds } = await useMultiFileAuthState("auth")
 const { version } = await fetchLatestBaileysVersion()
 
 const sock = makeWASocket({
+
 version,
 auth: state,
-printQRInTerminal: false
+printQRInTerminal: false,
+
+// mejora estabilidad
+syncFullHistory: false,
+markOnlineOnConnect: true,
+defaultQueryTimeoutMs: undefined
+
 })
 
 sock.ev.on("creds.update", saveCreds)
+
+// ===============================
+// CONEXION
+// ===============================
 
 sock.ev.on("connection.update", (update) => {
 
 const { connection, qr, lastDisconnect } = update
 
 if (qr) {
+
 console.log("📱 Escanea el QR con WhatsApp")
 qrcode.generate(qr, { small: true })
+
 }
 
 if (connection === "open") {
+
 console.log("✅ WhatsApp conectado correctamente")
+
 }
 
 if (connection === "close") {
 
 const reason = lastDisconnect?.error?.output?.statusCode
 
-const shouldReconnect = reason !== DisconnectReason.loggedOut
+console.log("❌ Conexión cerrada:", reason)
 
-console.log("❌ Conexión cerrada. Reconectar:", shouldReconnect)
+// si fue reemplazado por otro dispositivo
+if (reason === 440 || reason === 401) {
+
+console.log("⚠️ Sesión reemplazada por otro dispositivo")
+console.log("⏸ Esperando nueva conexión...")
+
+return
+
+}
+
+const shouldReconnect = reason !== DisconnectReason.loggedOut
 
 if (shouldReconnect) {
 
+console.log("🔄 Reconectando en 10 segundos...")
+
 setTimeout(() => {
+
 startBot()
-}, 5000)
+
+}, 10000)
 
 }
 
 }
 
 })
-
 
 // ===============================
 // MENSAJES
@@ -111,7 +143,7 @@ const from = msg.key.remoteJid
 // ❌ ignorar grupos
 if (from.endsWith("@g.us")) return
 
-// ❌ ignorar mensajes antiguos al iniciar
+// ❌ ignorar mensajes viejos al iniciar
 if (msg.messageTimestamp * 1000 < Date.now() - 10000) return
 
 const ahora = Date.now()
@@ -123,6 +155,7 @@ const ahora = Date.now()
 if (msg.key.fromMe) {
 
 conversacionesHumanas[from] = ahora
+
 guardarMemoria()
 
 console.log("👨‍⚖️ Conversación humana detectada")
@@ -132,7 +165,7 @@ return
 }
 
 // ===============================
-// SI HAY CONVERSACION HUMANA
+// SI EXISTE CONVERSACION HUMANA
 // ===============================
 
 if (conversacionesHumanas[from]) {
@@ -142,6 +175,7 @@ const ultima = conversacionesHumanas[from]
 if (ahora - ultima < OCHO_HORAS) {
 
 conversacionesHumanas[from] = ahora
+
 guardarMemoria()
 
 console.log("⏸ Bot pausado para este cliente")
@@ -180,29 +214,34 @@ if (!text) return
 
 console.log("📩 Mensaje recibido:", text)
 
-
 // ===============================
 // ENVIAR AL SERVIDOR
 // ===============================
 
 const response = await axios.post(
+
 "https://bot-juridicas-bogota.onrender.com/chat",
+
 {
 sessionId: from,
 message: text
 },
+
 {
 timeout: 15000
 }
+
 )
 
 const replies = response?.data?.messages || []
 
 if (!replies.length) {
-console.log("⚠️ No hubo respuesta del servidor")
-return
-}
 
+console.log("⚠️ No hubo respuesta del servidor")
+
+return
+
+}
 
 // ===============================
 // RESPONDER
@@ -221,9 +260,13 @@ text: r
 console.log("❌ Error procesando mensaje")
 
 if (error.response) {
+
 console.log(error.response.data)
+
 } else {
+
 console.log(error.message)
+
 }
 
 }
