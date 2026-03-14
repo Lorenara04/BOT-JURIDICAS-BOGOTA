@@ -48,8 +48,9 @@ function guardarMemoria() {
 // BOT
 // ===============================
 async function startBot() {
-  // Carpeta 'auth' que prometiste no borrar
-  const { state, saveCreds } = await useMultiFileAuthState("auth")
+  // CAMBIO CLAVE: Usamos ruta relativa para que lea la carpeta que ya tienes en GitHub
+  // y no la que Render intenta crear vacía en la raíz.
+  const { state, saveCreds } = await useMultiFileAuthState("./auth")
   const { version } = await fetchLatestBaileysVersion()
 
   const sock = makeWASocket({
@@ -58,9 +59,11 @@ async function startBot() {
     printQRInTerminal: false,
     syncFullHistory: false,
     markOnlineOnConnect: true,
-    // Ajuste para evitar que la conexión se cuelgue en la nube
+    // Ajustes para evitar que la conexión se cuelgue en la nube
     defaultQueryTimeoutMs: 60000, 
-    connectTimeoutMs: 60000
+    connectTimeoutMs: 60000,
+    // Esto ayuda a que no ignore mensajes por latencia de Render
+    shouldIgnoreJidAlphabeticalOrder: true,
   })
 
   // Guardar credenciales cada vez que se actualicen
@@ -86,9 +89,10 @@ async function startBot() {
       console.log("❌ Conexión cerrada. Razón:", reason)
 
       // Si la sesión es inválida (401), ahí sí tendrías que volver a pedir QR, 
-      // pero mientras sea otro error, reintentamos:
       if (reason === 401 || reason === 440) {
         console.log("⚠️ SESIÓN INVÁLIDA O REEMPLAZADA. Revisa la carpeta auth.");
+        // Intentamos reconectar de todos modos por si es un error temporal de permisos
+        setTimeout(() => startBot(), 15000)
         return;
       }
 
@@ -154,10 +158,10 @@ async function startBot() {
       console.log(`📩 Mensaje de ${from}: ${text}`)
 
       // ===============================
-      // ENVIAR AL SERVER (Usa localhost para evitar fallos de red en Render)
+      // ENVIAR AL SERVER (Usa 127.0.0.1 para asegurar conexión local en Render)
       // ===============================
       const PORT = process.env.PORT || 10000;
-      const response = await axios.post(`http://localhost:${PORT}/chat`, {
+      const response = await axios.post(`http://127.0.0.1:${PORT}/chat`, {
         sessionId: from,
         message: text
       }, { timeout: 20000 });
@@ -170,7 +174,7 @@ async function startBot() {
       for (const r of replies) {
         await sock.sendMessage(from, { text: r })
         // Pequeño delay entre mensajes para que parezca más natural
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
 
     } catch (error) {

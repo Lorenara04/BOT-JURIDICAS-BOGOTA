@@ -3,7 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 import fetch from "node-fetch";
-import "./bot.js"; // Asegúrate de que bot.js esté en la misma carpeta
+// El bot.js se encarga de la conexión de WhatsApp y debe usar la carpeta montada en el Disk de Render
+import "./bot.js"; 
 
 dotenv.config();
 
@@ -13,9 +14,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Endpoint de salud para que Render sepa que el bot está vivo
+// ===============================
+// ENDPOINT DE SALUD (Health Check)
+// Fundamental para que Render no reinicie el servicio constantemente
+// ===============================
 app.get("/", (req, res) => {
-  res.send("Bot Jurídicas Bogotá activo y funcionando ⚖️");
+  res.status(200).send("Bot Jurídicas Bogotá activo y funcionando ⚖️");
 });
 
 const openai = new OpenAI({
@@ -24,31 +28,22 @@ const openai = new OpenAI({
 
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby6yTmqBFvuAmYKSTIiLw3hVYH6iR8X2ZVKaWSlOfCPlFBDabbikMyzU6xbdFlwYU5A0g/exec";
 
-// Memoria volátil de sesiones (En Render se borra al reiniciar si no usas DB, tenlo en cuenta)
+// Memoria de sesiones
 const sessions = {};
 
 // ===============================
-// HORA COLOMBIA
+// UTILIDADES
 // ===============================
 function obtenerHoraColombia() {
   const ahora = new Date();
-  const hora = new Intl.DateTimeFormat("es-CO", {
-    timeZone: "America/Bogota",
-    hour: "numeric",
-    hour12: false
-  }).format(ahora);
-
-  const dia = new Intl.DateTimeFormat("es-CO", {
-    timeZone: "America/Bogota",
-    weekday: "short"
-  }).format(ahora);
-
-  return { hora: parseInt(hora), dia };
+  const format = (options) => new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", ...options }).format(ahora);
+  
+  return { 
+    hora: parseInt(format({ hour: "numeric", hour12: false })), 
+    dia: format({ weekday: "short" }) 
+  };
 }
 
-// ===============================
-// ENVIAR A GOOGLE SHEETS
-// ===============================
 async function enviarAGoogleSheets(datos) {
   try {
     const response = await fetch(GOOGLE_SCRIPT_URL, {
@@ -56,15 +51,12 @@ async function enviarAGoogleSheets(datos) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(datos),
     });
-    console.log("Lead guardado en Google Sheets:", response.status);
+    console.log(`Lead guardado en Google Sheets. Status: ${response.status}`);
   } catch (error) {
     console.error("Error enviando a Google Sheets:", error);
   }
 }
 
-// ===============================
-// DETECTAR AREA CON IA
-// ===============================
 async function detectarArea(caso) {
   try {
     const response = await openai.chat.completions.create({
@@ -72,7 +64,7 @@ async function detectarArea(caso) {
       messages: [
         {
           role: "system",
-          content: "Clasifica el caso en UNA sola área: Transporte, Laboral y Seguridad Social, Administrativo, Civil, Comercial, Familia, Penal, Seguros. Responde SOLO el nombre."
+          content: "Clasifica el caso en UNA sola área: Transporte, Laboral y Seguridad Social, Administrativo, Civil, Comercial, Familia, Penal, Seguros. Responde SOLO el nombre del área."
         },
         { role: "user", content: caso }
       ],
@@ -85,9 +77,6 @@ async function detectarArea(caso) {
   }
 }
 
-// ===============================
-// EXTRAER DATOS (MEJORADO)
-// ===============================
 function extraerDatos(texto) {
   let nombre = "", cedula = "", correo = "", telefono = "";
   const lineas = texto.split("\n");
@@ -103,17 +92,16 @@ function extraerDatos(texto) {
        const match = limpio.match(/\d{5,15}/);
        if (match) cedula = match[0];
     }
-    if (!nombre && /^[a-zA-ZÁÉÍÓÚÑáéíóúñ\s]{10,}$/.test(limpio)) nombre = limpio;
+    if (!nombre && /^[a-zA-ZÁÉÍÓÚÑáéíóúñ\s]{8,}$/.test(limpio)) nombre = limpio;
   });
 
   return { nombre, cedula, correo, telefono };
 }
 
 // ===============================
-// LOGICA DEL BOT CORREGIDA
+// LÓGICA DEL BOT
 // ===============================
 export async function procesarMensaje(sessionId, message) {
-  // 1. Inicializar sesión si no existe
   if (!sessions[sessionId]) {
     sessions[sessionId] = {
       estado: "BIENVENIDA",
@@ -124,15 +112,12 @@ export async function procesarMensaje(sessionId, message) {
   }
 
   const session = sessions[sessionId];
-  const msgLimpio = message.toLowerCase().trim();
 
-  // 2. Manejo de BIENVENIDA
   if (session.estado === "BIENVENIDA") {
     session.estado = "ESPERANDO_CASO";
     return [`Bienvenido(a) a *JURÍDICAS BOGOTÁ* ⚖️\n\nSomos una firma especializada en consultoría y acompañamiento legal.\n\nPor favor, *descríbanos brevemente su situación* para asignarle el área correcta.`];
   }
 
-  // 3. Manejo de ESPERANDO_CASO
   if (session.estado === "ESPERANDO_CASO") {
     if (message.length < 15) {
       return ["Para poder ayudarle, por favor descríbanos su caso con un poco más de detalle."];
@@ -149,7 +134,6 @@ export async function procesarMensaje(sessionId, message) {
     ];
   }
 
-  // 4. Manejo de ESPERANDO_DATOS
   if (session.estado === "ESPERANDO_DATOS") {
     const nuevosDatos = extraerDatos(message);
 
@@ -158,12 +142,10 @@ export async function procesarMensaje(sessionId, message) {
     if (nuevosDatos.correo) session.datos.correo = nuevosDatos.correo;
     if (nuevosDatos.telefono) session.datos.telefono = nuevosDatos.telefono;
 
-    // Verificar si ya tenemos todo
     if (!session.datos.nombre || !session.datos.cedula || !session.datos.correo || !session.datos.telefono) {
-      return ["Aún nos faltan algunos datos (Nombre, Cédula, Correo o Teléfono). Por favor, asegúrese de enviarlos para finalizar el registro."];
+      return ["Aún nos faltan algunos datos. Por favor, envíe su Nombre, Cédula, Correo y Teléfono para finalizar el registro."];
     }
 
-    // Si ya están completos, enviar a Sheets
     const lead = {
       area_juridica: session.area,
       nombre: session.datos.nombre,
@@ -178,12 +160,6 @@ export async function procesarMensaje(sessionId, message) {
     session.estado = "FINALIZADO";
 
     return ["¡Excelente! Hemos recibido su información.\n\nUn abogado especialista se pondrá en contacto con usted a la brevedad. Gracias por confiar en *JURÍDICAS BOGOTÁ*."];
-  }
-
-  // 5. Estado FINALIZADO
-  if (session.estado === "FINALIZADO") {
-    // Si vuelve a escribir después de un rato, podrías reiniciar el bot aquí si quisieras.
-    return [];
   }
 
   return [];
@@ -206,7 +182,7 @@ app.post("/chat", async (req, res) => {
 });
 
 // ===============================
-// SERVIDOR
+// INICIO SERVIDOR
 // ===============================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
