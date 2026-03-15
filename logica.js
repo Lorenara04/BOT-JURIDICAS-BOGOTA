@@ -9,12 +9,15 @@ const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby6yTmqBFvuAm
 
 export const sessions = {};
 
+/**
+ * Valida horario laboral de Bogotá
+ */
 function estaEnHorarioLaboral() {
   const ahora = new Date();
   const fechaBogota = new Date(ahora.toLocaleString("en-US", { timeZone: "America/Bogota" }));
   const dia = fechaBogota.getDay(); 
   const hora = fechaBogota.getHours();
-  // Lunes (1) a Viernes (5) de 8am a 6pm
+  // Lunes (1) a Viernes (5) de 8:00 AM a 6:00 PM
   return (dia >= 1 && dia <= 5) && (hora >= 8 && hora < 18);
 }
 
@@ -25,7 +28,7 @@ async function enviarAGoogleSheets(datos) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(datos),
     });
-  } catch (e) { console.error("Error Sheets:", e); }
+  } catch (e) { console.error("Error al enviar a Sheets:", e); }
 }
 
 async function detectarArea(caso) {
@@ -62,39 +65,58 @@ export async function procesarMensaje(sessionId, message) {
 
   if (s.estado === "CERRADO") return [];
 
+  // PASO 1: BIENVENIDA
   if (s.estado === "BIENVENIDA") {
     s.estado = "ESPERANDO_CASO";
-    let bienvenida = `Bienvenido(a) a *JURÍDICAS BOGOTÁ* ⚖️\n\nSomos especialistas en consultoría, auditoría y representación legal integral.`;
+    
+    let bienvenida = !estaEnHorarioLaboral() 
+      ? `*FUERA DE HORARIO*\n\nBienvenido(a) a *JURÍDICAS BOGOTÁ* ⚖️`
+      : `Bienvenido(a) a *JURÍDICAS BOGOTÁ* ⚖️`;
+    
+    bienvenida += `\n\nSomos especialistas en consultoría, auditoría y representación legal integral.`;
     
     if (!estaEnHorarioLaboral()) {
-      bienvenida += `\n\nLe informamos que nuestro horario laboral es de lunes a viernes de 8am a 6pm. Sin embargo, tomaremos sus datos para que un abogado se contacte con usted lo más pronto posible.`;
+      bienvenida += `\n\nLe informamos que nuestro horario laboral es de lunes a viernes de 8:00 a.m. a 6:00 p.m. No obstante, tomaremos sus datos para que un abogado se contacte con usted a la brevedad.`;
     }
+
     bienvenida += `\n\nPor favor, *descríbanos brevemente su situación* para asignarle el área correcta.`;
     return [bienvenida];
   }
 
+  // PASO 2: CLASIFICACIÓN
   if (s.estado === "ESPERANDO_CASO") {
     const area = await detectarArea(message);
-    s.area = area; s.caso = message; s.estado = "ESPERANDO_DATOS";
-    
-    // Enviamos el caso inicial (usamos ambos nombres de campo para asegurar que el script lo capte)
-    await enviarAGoogleSheets({ area_juridica: s.area, observacion: s.caso, observaciones: s.caso, estado: "En Proceso" });
+    s.area = area; 
+    s.caso = message; 
+    s.estado = "ESPERANDO_DATOS";
     
     return [`He identificado que su caso pertenece al área de *${area}*.\n\nPara asignarle un abogado especializado, por favor indíquenos:\n\n1️⃣ Nombre completo\n2️⃣ Número de cédula\n3️⃣ Correo electrónico\n4️⃣ Número de teléfono`];
   }
 
+  // PASO 3: CAPTURA DE DATOS Y ENVÍO FINAL
   if (s.estado === "ESPERANDO_DATOS") {
     const nuevosDatos = extraerDatos(message);
     s.datos = { ...s.datos, ...nuevosDatos };
     
-    // Envío final de todos los datos recolectados
-    await enviarAGoogleSheets({ ...s.datos, area_juridica: s.area, observacion: s.caso, observaciones: s.caso });
+    // Determinamos el estado del lead para el Excel
+    const estadoParaSheet = estaEnHorarioLaboral() ? "Atención Inmediata" : "FUERA DE HORARIO";
+    
+    // Envío único y final para evitar duplicados
+    await enviarAGoogleSheets({ 
+        ...s.datos, 
+        area_juridica: s.area, 
+        observacion: s.caso, 
+        observaciones: s.caso,
+        estado: estadoParaSheet 
+    });
     
     s.estado = "CERRADO";
+    
     let despedida = "Agradecemos la información suministrada.";
     despedida += !estaEnHorarioLaboral() 
-      ? " Como estamos fuera de horario, un abogado se pondrá en contacto con usted lo más pronto posible." 
+      ? " Como nos escribió fuera de horario, un abogado revisará su caso y se pondrá en contacto con usted en el próximo día hábil." 
       : " En breve un abogado especializado se pondrá en contacto con usted.";
+    
     return [despedida];
   }
   return [];
